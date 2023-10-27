@@ -39,6 +39,7 @@ import json
 
 def is_float(num: str) -> bool :
     '''
+    Helper function to check if a string is useable as a float value
     num is expected to be a string
     '''
     try:
@@ -89,6 +90,10 @@ class Garage():
         self.max_daily = 25
         self.last_ticket_number = 1001
 
+    def open_gate(self):
+        # ideally, this opens the gate. Placeholder for now.
+        pass
+
     def get_ticket(self):
         # Assign parking space
         parking_space = random.randint(100, 125)
@@ -97,7 +102,8 @@ class Garage():
         self.occupied_spaces.add(parking_space)
 
         # Assign ticket number
-        while self.last_ticket_number in self.ticket:
+        # first checking if the current number is in today's tickets or carry-voer tickets
+        while self.last_ticket_number in self.tickets or self.last_ticket_number in self.current_tickets:
             self.last_ticket_number += 1
         ticket_number = self.last_ticket_number
         self.current_tickets.add(ticket_number)
@@ -108,20 +114,31 @@ class Garage():
                                                 'out_time': -1,
                                                 'paid' : False
                                                }
+        
+        self.open_gate()
         return ticket_number
 
     def take_ticket(self):
+        # Check if lot is full
         if self.lot_full == True:
             return 'Sorry, the lot is currently full.'
         ticket_number  = self.get_ticket()
         print(f'Please take your ticket and park in spot {self.tickets[ticket_number]["parking_space"]}')
+
+        # Update spaces available and lot_full status
         self.parking_spaces -= 1
         if self.parking_spaces == 0:
             self.lot_full = True
         
-    def rate_formula(self, ticket_number):
-        self.tickets[ticket_number]['time_out'] = datetime.now()
+    def rate_formula(self, ticket_number, end_time = -1):
+        # get current time
+        if end_time == -1:  # this should always be true, but need a way to test functionality
+            self.tickets[ticket_number]['time_out'] = datetime.now()
+        else:
+            self.tickets[ticket_number]['time_out'] = end_time
+
         time_parked = (self.tickets[ticket_number]['time_out'] - self.tickets[ticket_number]['time_in']) // 1   # to get a whole number
+        
         # Check for multiple days
         if time_parked.days > 0:
             result = time_parked.days * self.max_daily
@@ -137,7 +154,6 @@ class Garage():
         return result
 
     def pay_for_parking(self, ticket_number = -1):
-        
         # Get ticket number
         valid = False
         while valid == False and ticket_number == -1:
@@ -176,13 +192,19 @@ class Garage():
 
 
     def leave_garage(self, ticket):
+        # check if not paid, call payment func
         if self.tickets[ticket]['paid'] == False:
             self.pay_for_parking(ticket)
         
+        # check if ticket paid more than 15 minutes ago
+        # call payment func
         elif self.tickets[ticket]['time_out'] - datetime.now() > 15:
                 print('Sorry, exit time limit exceeded')
                 self.pay_for_parking(ticket)
+        
+        #else, exit garage
         else:
+            self.open_gate()
             print('Thank you, have a nice day!')
         
 
@@ -193,6 +215,20 @@ class Garage():
 
         self.parking_spaces += 1
         self.current_tickets.remove(ticket)
+    
+    def day_log(self):
+        # All tickets stored to log
+        # self.tickets cleared for next day
+        # Set ticket number back to base
+        # Carry over outstanding tickets/spaces
+        # Triggered by timed call on a daemon thread
+
+        file_name = datetime.date().strftime("%Y%m%d") + 'tickets.json'
+        with open(file_name, 'w') as f:
+            f.write(json.dumps(self.tickets))
+        self.tickets.clear()
+        self.last_ticket_number = 1001
+
     
 thing = '1,236,634.10'
 print(thing.split('.'))
@@ -211,3 +247,7 @@ change -= timedelta(days = change.days)
 print(now)
 print(then)
 print(change.days)
+
+today = datetime.now().strftime('%Y%m%d')
+print(type(today))
+
